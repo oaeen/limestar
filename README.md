@@ -2,6 +2,8 @@
 
 AI 驱动的链接收藏系统，自动生成中文介绍和标签。
 
+![LimeStar Screenshot](limestar_screenshot.png)
+
 ## 功能特点
 
 - 📎 保存链接并自动抓取网页内容

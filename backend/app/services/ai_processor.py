@@ -55,7 +55,7 @@ class AIProcessor:
                 f"\n现有标签供参考（优先使用这些标签）: {', '.join(existing_tags[:20])}"
             )
 
-        prompt = f"""你是一个链接收藏助手。请分析以下网页内容，生成简洁的中文介绍和相关标签。
+        prompt = f"""你是一个技术链接收藏助手。请分析以下网页内容，生成简洁的中文介绍和精准的技术标签。
 
 URL: {url}
 原标题: {title or '无'}
@@ -75,8 +75,13 @@ URL: {url}
 要求：
 1. 标题简洁明了，不超过30字
 2. 介绍必须控制在120字以内，突出内容的价值和特点，不要换行
-3. 标签2-5个，使用通用的分类词（如：工具、设计、开发、AI、教程、资源等）
-4. 所有内容使用中文"""
+3. 标签要求：
+   - 2-5个标签
+   - 使用具体的技术术语而非宽泛分类
+   - 除专业术语保留英文原文（如 LLM, Agent, Claude, GPT, Gemini, MCP, RAG, Prompt Engineering, LangChain, VibeCoding, Next.js, React 等），其他均使用中文
+   - 避免使用过于宽泛的标签如"AI"、"开发"、"工具"、"教程"、"资源"
+   - 标签应能精确描述内容涉及的具体技术、框架、产品或方法论
+"""
 
         try:
             response = await self.client.chat.completions.create(

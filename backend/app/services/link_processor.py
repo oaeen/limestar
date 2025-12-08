@@ -12,6 +12,13 @@ from app.services.ai_processor import ai_processor
 class LinkProcessor:
     """Orchestrates the full link processing pipeline"""
 
+    def _normalize_url(self, url: str) -> str:
+        """规范化URL，确保有协议前缀"""
+        url = url.strip()
+        if not url.startswith(('http://', 'https://')):
+            url = 'https://' + url
+        return url
+
     async def process_link(
         self,
         link_id: int,
@@ -97,6 +104,9 @@ class LinkProcessor:
             Processed Link object
         """
         from urllib.parse import urlparse
+
+        # Normalize URL (add https:// if missing)
+        url = self._normalize_url(url)
 
         # Extract domain
         parsed = urlparse(url)

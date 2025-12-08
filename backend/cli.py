@@ -164,12 +164,16 @@ def interactive_mode():
                     print("请输入搜索关键词，如: search AI")
                 continue
 
-            # 添加链接 - 检测是否是 URL
-            if user_input.startswith(("http://", "https://", "www.")):
-                # 解析 URL 和备注
-                parts = user_input.split(maxsplit=1)
-                url = parts[0]
-                if url.startswith("www."):
+            # 添加链接 - 检测是否是 URL（支持不带协议前缀的域名）
+            # 解析 URL 和备注
+            parts = user_input.split(maxsplit=1)
+            potential_url = parts[0]
+
+            # 判断是否像一个URL（包含点号且不是纯命令）
+            if "." in potential_url and not potential_url.startswith("."):
+                url = potential_url
+                # 添加 https:// 前缀（如果没有）
+                if not url.startswith(("http://", "https://")):
                     url = "https://" + url
                 note = parts[1] if len(parts) > 1 else None
 
