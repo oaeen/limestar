@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { linksAPI, searchAPI } from '../services/api';
 import type { Link, LinkListResponse } from '../types';
 
@@ -16,6 +16,7 @@ interface UseLinksResult {
   isLoading: boolean;
   error: Error | null;
   refetch: () => void;
+  deleteLink: (id: number) => Promise<void>;
 }
 
 export function useLinks({
@@ -27,9 +28,13 @@ export function useLinks({
   const [data, setData] = useState<LinkListResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const isFirstLoad = useRef(true);
 
   const fetchLinks = useCallback(async () => {
-    setIsLoading(true);
+    // 只在首次加载时显示 loading，避免搜索时卡片闪烁
+    if (isFirstLoad.current) {
+      setIsLoading(true);
+    }
     setError(null);
 
     try {
@@ -56,11 +61,32 @@ export function useLinks({
       setError(err instanceof Error ? err : new Error('Failed to fetch links'));
     } finally {
       setIsLoading(false);
+      isFirstLoad.current = false;
     }
   }, [searchQuery, selectedTags, page, pageSize]);
 
   useEffect(() => {
     fetchLinks();
+  }, [fetchLinks]);
+
+  const deleteLink = useCallback(async (id: number) => {
+    try {
+      await linksAPI.delete(id);
+      // 乐观更新：立即从列表中移除
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              items: prev.items.filter((link) => link.id !== id),
+              total: prev.total - 1,
+            }
+          : null
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error('Failed to delete link'));
+      // 删除失败时重新获取列表
+      fetchLinks();
+    }
   }, [fetchLinks]);
 
   return {
@@ -70,5 +96,6 @@ export function useLinks({
     isLoading,
     error,
     refetch: fetchLinks,
+    deleteLink,
   };
 }

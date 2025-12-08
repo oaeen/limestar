@@ -7,9 +7,10 @@ interface LinkListProps {
   links: Link[];
   isLoading?: boolean;
   onTagClick?: (tagName: string) => void;
+  onDeleteLink?: (linkId: number) => void;
 }
 
-export function LinkList({ links, isLoading, onTagClick }: LinkListProps) {
+export function LinkList({ links, isLoading, onTagClick, onDeleteLink }: LinkListProps) {
   // Loading skeleton
   if (isLoading) {
     return (
@@ -74,6 +75,7 @@ export function LinkList({ links, isLoading, onTagClick }: LinkListProps) {
             key={link.id}
             link={link}
             onTagClick={onTagClick}
+            onDelete={onDeleteLink}
           />
         ))}
       </AnimatePresence>

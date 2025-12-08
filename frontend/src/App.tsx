@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Header } from './components/Header';
 import { SearchBar } from './components/SearchBar';
 import { TagFilter } from './components/TagFilter';
@@ -14,22 +14,30 @@ function App() {
   // Debounced search
   const [debouncedQuery, setDebouncedQuery] = useState('');
 
-  // Debounce search input
-  const handleSearchChange = useCallback((value: string) => {
-    setSearchQuery(value);
-    // Simple debounce
+  // 正确的防抖实现：使用 useEffect 确保定时器被正确清理
+  useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedQuery(value);
+      setDebouncedQuery(searchQuery);
     }, 300);
     return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchQuery(value);
   }, []);
 
   // Fetch data
-  const { tags } = useTags();
-  const { links, isLoading } = useLinks({
+  const { tags, refetch: refetchTags } = useTags();
+  const { links, isLoading, deleteLink } = useLinks({
     searchQuery: debouncedQuery,
     selectedTags,
   });
+
+  // 删除链接
+  const handleDeleteLink = useCallback(async (linkId: number) => {
+    await deleteLink(linkId);
+    refetchTags(); // 刷新标签计数
+  }, [deleteLink, refetchTags]);
 
   // Tag selection handlers
   const handleTagSelect = useCallback((tagName: string) => {
@@ -79,6 +87,7 @@ function App() {
           links={links}
           isLoading={isLoading}
           onTagClick={handleTagSelect}
+          onDeleteLink={handleDeleteLink}
         />
 
         {/* Total count */}
