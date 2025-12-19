@@ -1,6 +1,4 @@
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { GlassTag } from './ui/GlassTag';
+import { motion } from 'framer-motion';
 import type { CategoryWithTags } from '../types';
 
 interface TagFilterProps {
@@ -16,117 +14,65 @@ export function TagFilter({
   onTagSelect,
   onClearAll,
 }: TagFilterProps) {
-  // Track expanded categories (all expanded by default)
-  const [expandedCategories, setExpandedCategories] = useState<Set<number>>(
-    () => new Set(categories.map((c) => c.id))
-  );
-
-  const toggleCategory = (categoryId: number) => {
-    setExpandedCategories((prev) => {
-      const next = new Set(prev);
-      if (next.has(categoryId)) {
-        next.delete(categoryId);
-      } else {
-        next.add(categoryId);
-      }
-      return next;
-    });
-  };
-
   // Filter categories with links
   const visibleCategories = categories.filter((c) => c.count > 0);
 
   return (
-    <div className="space-y-3">
-      {/* Selected Tags */}
-      {selectedTags.length > 0 && (
-        <motion.div
-          className="flex items-center gap-2 flex-wrap"
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          exit={{ opacity: 0, height: 0 }}
-        >
-          <span className="text-sm text-gray-500">已选:</span>
-          {selectedTags.map((tagName) => (
-            <GlassTag
-              key={tagName}
-              name={tagName}
-              active
-              onClick={() => onTagSelect(tagName)}
-            />
-          ))}
-          {onClearAll && (
-            <button
-              className="text-sm text-apple-blue hover:underline"
-              onClick={onClearAll}
-            >
-              清除全部
-            </button>
-          )}
-        </motion.div>
-      )}
-
+    <div className="space-y-4">
       {/* "All" button */}
-      <div className="flex gap-2 flex-wrap">
-        <GlassTag
-          name="全部"
-          active={selectedTags.length === 0}
-          onClick={onClearAll}
-        />
-      </div>
+      <motion.button
+        className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+          selectedTags.length === 0
+            ? 'bg-gray-900 text-white'
+            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+        }`}
+        onClick={onClearAll}
+        whileTap={{ scale: 0.97 }}
+      >
+        全部
+      </motion.button>
 
       {/* Categories with tags */}
-      <div className="space-y-2">
-        {visibleCategories.map((category) => (
-          <div key={category.id} className="space-y-1">
-            {/* Category header */}
-            <button
-              className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
-              onClick={() => toggleCategory(category.id)}
-            >
-              <span
-                className={`transition-transform ${
-                  expandedCategories.has(category.id) ? 'rotate-90' : ''
-                }`}
-              >
-                ▶
-              </span>
-              <span
-                className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: category.color }}
-              />
-              <span>{category.name}</span>
-              <span className="text-gray-400">({category.count})</span>
-            </button>
+      {visibleCategories.map((category) => (
+        <div key={category.id} className="flex flex-wrap items-center gap-2">
+          {/* Category label */}
+          <span
+            className="px-3 py-1.5 rounded-lg text-sm font-medium text-white"
+            style={{ backgroundColor: category.color }}
+          >
+            {category.name}
+          </span>
 
-            {/* Child tags */}
-            <AnimatePresence>
-              {expandedCategories.has(category.id) && (
-                <motion.div
-                  className="flex gap-2 flex-wrap pl-5"
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.2 }}
+          {/* Child tags */}
+          {category.tags
+            .filter((tag) => tag.count > 0)
+            .map((tag) => {
+              const isActive = selectedTags.includes(tag.name);
+              return (
+                <motion.button
+                  key={tag.id}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all border ${
+                    isActive
+                      ? 'text-white border-transparent'
+                      : 'text-gray-600 border-gray-200 bg-white hover:border-gray-300'
+                  }`}
+                  style={
+                    isActive
+                      ? { backgroundColor: category.color }
+                      : undefined
+                  }
+                  onClick={() => onTagSelect(tag.name)}
+                  whileTap={{ scale: 0.97 }}
                 >
-                  {category.tags
-                    .filter((tag) => tag.count > 0)
-                    .map((tag) => (
-                      <GlassTag
-                        key={tag.id}
-                        name={tag.name}
-                        color={tag.color}
-                        count={tag.count}
-                        active={selectedTags.includes(tag.name)}
-                        onClick={() => onTagSelect(tag.name)}
-                      />
-                    ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        ))}
-      </div>
+                  {tag.name}
+                  <span className={`ml-1 ${isActive ? 'opacity-70' : 'text-gray-400'}`}>
+                    {tag.count}
+                  </span>
+                </motion.button>
+              );
+            })}
+        </div>
+      ))}
     </div>
   );
 }

@@ -65,31 +65,20 @@ def get_link(link_id: int, session: Session = Depends(get_session)):
 
 
 @router.post("", response_model=LinkResponse, status_code=201)
-def create_link(
+async def create_link(
     link_data: LinkCreate,
     session: Session = Depends(get_session),
     _: str = Depends(require_auth),
 ):
-    """Create a new link (without AI processing - just store). Requires authentication."""
-    from urllib.parse import urlparse
+    """Create a new link and process it with AI. Requires authentication."""
+    from app.services.link_processor import link_processor
 
-    # Extract domain
-    parsed = urlparse(link_data.url)
-    domain = parsed.netloc or parsed.path.split("/")[0]
-
-    # Create link
-    link = Link(
+    link = await link_processor.add_and_process_link(
         url=str(link_data.url),
-        title=domain,  # Temporary title, will be updated by AI
-        description="",
         user_note=link_data.user_note,
-        domain=domain,
-        is_processed=False,
+        session=session,
+        submitted_by="web",
     )
-
-    session.add(link)
-    session.commit()
-    session.refresh(link)
 
     return _link_to_response(link)
 
