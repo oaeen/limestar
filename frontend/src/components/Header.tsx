@@ -10,10 +10,10 @@ export function Header() {
 
   return (
     <header className="px-4 py-4 md:px-6 md:py-5">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-3xl mx-auto flex justify-center">
         {/* Logo */}
         <h1
-          className="text-2xl md:text-3xl font-bold tracking-tight text-center"
+          className="text-2xl md:text-3xl font-bold tracking-tight"
           style={{
             background: 'linear-gradient(135deg, #84cc16 0%, #65a30d 50%, #facc15 100%)',
             WebkitBackgroundClip: 'text',
@@ -23,9 +23,8 @@ export function Header() {
             fontFamily: '"Comic Sans MS", "Chalkboard", "Comic Neue", cursive, sans-serif',
           }}
         >
-          LimeStar
+          🍋 LimeStar
         </h1>
-
       </div>
 
       {/* 认证按钮 - 固定在网页右上角 */}
