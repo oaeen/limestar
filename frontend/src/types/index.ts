@@ -44,3 +44,14 @@ export interface PaginatedResponse<T> {
 }
 
 export interface LinkListResponse extends PaginatedResponse<Link> {}
+
+// ============== Auth Types ==============
+export interface LoginResponse {
+  success: boolean;
+  token?: string;
+  message: string;
+}
+
+export interface VerifyResponse {
+  valid: boolean;
+}

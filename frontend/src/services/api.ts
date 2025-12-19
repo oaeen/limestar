@@ -1,6 +1,6 @@
 // LimeStar API Service
 
-import type { Link, LinkListResponse, TagWithCount, CategoryWithTags } from '../types';
+import type { Link, LinkListResponse, TagWithCount, CategoryWithTags, LoginResponse, VerifyResponse } from '../types';
 
 const API_BASE = '/api';
 
@@ -101,5 +101,29 @@ export const searchAPI = {
     if (params.page_size) searchParams.set('page_size', String(params.page_size));
 
     return fetchAPI<LinkListResponse>(`/search?${searchParams.toString()}`);
+  },
+};
+
+// Auth API
+export const authAPI = {
+  login: (password: string): Promise<LoginResponse> => {
+    return fetchAPI<LoginResponse>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    });
+  },
+
+  verify: (token: string): Promise<VerifyResponse> => {
+    return fetchAPI<VerifyResponse>('/auth/verify', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+  },
+
+  logout: (token: string): Promise<{ success: boolean }> => {
+    return fetchAPI<{ success: boolean }>('/auth/logout', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
   },
 };

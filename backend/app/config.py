@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     TELEGRAM_ALLOWED_USERS: str = ""  # 逗号分隔的用户 ID 列表
     WEBHOOK_URL: Optional[str] = None
 
+    # Web Admin Authentication
+    WEB_ADMIN_PASSWORD: str = ""  # Web 管理密码，为空则禁用 Web 管理功能
+
     def get_allowed_users(self) -> list[int]:
         """解析白名单用户 ID 列表"""
         if not self.TELEGRAM_ALLOWED_USERS:

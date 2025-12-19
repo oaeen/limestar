@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import init_db
-from app.api import links, tags, search, admin
+from app.api import links, tags, search, admin, auth
 from app.bot.telegram_bot import process_webhook_update, setup_webhook
 
 
@@ -54,6 +54,7 @@ app.include_router(links.router, prefix="/api")
 app.include_router(tags.router, prefix="/api")
 app.include_router(search.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
+app.include_router(auth.router, prefix="/api")
 
 
 @app.get("/")

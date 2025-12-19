@@ -3,13 +3,18 @@ import { Header } from './components/Header';
 import { SearchBar } from './components/SearchBar';
 import { TagFilter } from './components/TagFilter';
 import { LinkList } from './components/LinkList';
+import { AddLinkButton } from './components/AddLinkButton';
 import { useLinks } from './hooks/useLinks';
 import { useTags } from './hooks/useTags';
+import { AuthProvider, useAuthContext } from './contexts/AuthContext';
 
-function App() {
+function AppContent() {
   // State
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+
+  // Auth context
+  const { isAuthenticated } = useAuthContext();
 
   // Debounced search
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -28,16 +33,22 @@ function App() {
 
   // Fetch data
   const { categories, refetch: refetchTags } = useTags();
-  const { links, isLoading, deleteLink } = useLinks({
+  const { links, isLoading, deleteLink, refetch } = useLinks({
     searchQuery: debouncedQuery,
     selectedTags,
   });
 
-  // 删除链接
+  // 删除链接（仅认证后可用）
   const handleDeleteLink = useCallback(async (linkId: number) => {
     await deleteLink(linkId);
     refetchTags(); // 刷新标签计数
   }, [deleteLink, refetchTags]);
+
+  // 添加链接后的回调
+  const handleLinkAdded = useCallback(() => {
+    refetch();      // 刷新链接列表
+    refetchTags();  // 刷新标签
+  }, [refetch, refetchTags]);
 
   // Tag selection handlers
   const handleTagSelect = useCallback((tagName: string) => {
@@ -81,7 +92,7 @@ function App() {
           links={links}
           isLoading={isLoading}
           onTagClick={handleTagSelect}
-          onDeleteLink={handleDeleteLink}
+          onDeleteLink={isAuthenticated ? handleDeleteLink : undefined}
         />
 
         {/* Total count */}
@@ -91,7 +102,18 @@ function App() {
           </p>
         )}
       </main>
+
+      {/* 添加收藏按钮（仅认证后显示） */}
+      <AddLinkButton onLinkAdded={handleLinkAdded} />
     </div>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 
