@@ -46,8 +46,9 @@ class LinkProcessor:
             # 1. Fetch web content
             scraped = await web_scraper.fetch(link.url)
 
-            # 2. Get existing tags for reference
+            # 2. Get existing tags and categories for reference
             existing_tags = self._get_existing_tags(session)
+            existing_categories = self._get_existing_categories(session)
 
             # 3. AI processing
             result = await ai_processor.process(
@@ -56,6 +57,7 @@ class LinkProcessor:
                 content=scraped.text_content,
                 user_note=link.user_note,
                 existing_tags=existing_tags,
+                existing_categories=existing_categories,
             )
 
             # 4. Update link
@@ -66,8 +68,8 @@ class LinkProcessor:
             link.is_processed = True
             link.updated_at = datetime.utcnow()
 
-            # 5. Handle tags
-            self._update_link_tags(link, result.tags, session)
+            # 5. Handle tags (category + sub-tags)
+            self._update_link_tags(link, result.category, result.tags, session)
 
             session.add(link)
             session.commit()
@@ -135,30 +137,91 @@ class LinkProcessor:
         # Process the link
         return await self.process_link(link.id, session)
 
+    def _get_existing_categories(self, session: Session) -> List[str]:
+        """Get list of existing category names"""
+        categories = session.exec(
+            select(Tag).where(Tag.is_category == True)
+        ).all()
+        return [cat.name for cat in categories]
+
     def _get_existing_tags(self, session: Session) -> List[str]:
-        """Get list of existing tag names"""
-        tags = session.exec(select(Tag)).all()
+        """Get list of existing sub-tag names"""
+        tags = session.exec(
+            select(Tag).where(Tag.is_category == False)
+        ).all()
         return [tag.name for tag in tags]
 
     def _update_link_tags(
         self,
         link: Link,
+        category_name: str,
         tag_names: List[str],
         session: Session,
     ) -> None:
-        """Update link's tags, creating new tags if needed"""
+        """Update link's tags with hierarchical structure (category + sub-tags)"""
         # Clear existing tags
         link.tags = []
 
+        # 1. Find or create category
+        category = session.exec(
+            select(Tag).where(Tag.name == category_name, Tag.is_category == True)
+        ).first()
+
+        if not category:
+            # Create new category with a distinct color
+            category = Tag(
+                name=category_name,
+                is_category=True,
+                parent_id=None,
+                color=self._generate_category_color(session),
+            )
+            session.add(category)
+            session.flush()
+
+        link.tags.append(category)
+
+        # 2. Add sub-tags under this category
         for tag_name in tag_names:
-            # Find or create tag
-            tag = session.exec(select(Tag).where(Tag.name == tag_name)).first()
+            # Find existing sub-tag under this category
+            tag = session.exec(
+                select(Tag).where(
+                    Tag.name == tag_name,
+                    Tag.parent_id == category.id,
+                    Tag.is_category == False
+                )
+            ).first()
+
             if not tag:
-                tag = Tag(name=tag_name)
+                # Create new sub-tag
+                tag = Tag(
+                    name=tag_name,
+                    parent_id=category.id,
+                    is_category=False,
+                    color=category.color,  # Inherit category color
+                )
                 session.add(tag)
-                session.flush()  # Get the ID
+                session.flush()
 
             link.tags.append(tag)
+
+    def _generate_category_color(self, session: Session) -> str:
+        """Generate a color for new category based on existing count"""
+        colors = [
+            "#8B5CF6",  # Purple
+            "#06B6D4",  # Cyan
+            "#3B82F6",  # Blue
+            "#10B981",  # Green
+            "#F59E0B",  # Orange
+            "#EC4899",  # Pink
+            "#6B7280",  # Gray
+            "#EF4444",  # Red
+            "#14B8A6",  # Teal
+            "#F97316",  # Deep Orange
+        ]
+        category_count = session.exec(
+            select(Tag).where(Tag.is_category == True)
+        ).all()
+        return colors[len(category_count) % len(colors)]
 
 
 # Global instance

@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { tagsAPI } from '../services/api';
-import type { TagWithCount } from '../types';
+import type { TagWithCount, CategoryWithTags } from '../types';
 
 interface UseTagsResult {
   tags: TagWithCount[];
+  categories: CategoryWithTags[];
   isLoading: boolean;
   error: Error | null;
   refetch: () => void;
@@ -11,6 +12,7 @@ interface UseTagsResult {
 
 export function useTags(): UseTagsResult {
   const [tags, setTags] = useState<TagWithCount[]>([]);
+  const [categories, setCategories] = useState<CategoryWithTags[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -19,8 +21,12 @@ export function useTags(): UseTagsResult {
     setError(null);
 
     try {
-      const response = await tagsAPI.getAll();
-      setTags(response);
+      const [tagsResponse, categoriesResponse] = await Promise.all([
+        tagsAPI.getAll(),
+        tagsAPI.getCategories(),
+      ]);
+      setTags(tagsResponse);
+      setCategories(categoriesResponse);
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to fetch tags'));
     } finally {
@@ -34,6 +40,7 @@ export function useTags(): UseTagsResult {
 
   return {
     tags,
+    categories,
     isLoading,
     error,
     refetch: fetchTags,

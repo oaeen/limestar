@@ -4,10 +4,20 @@ export interface Tag {
   id: number;
   name: string;
   color: string;
+  parent_id: number | null;
+  is_category: boolean;
 }
 
 export interface TagWithCount extends Tag {
   count: number;
+}
+
+export interface CategoryWithTags {
+  id: number;
+  name: string;
+  color: string;
+  count: number;
+  tags: TagWithCount[];
 }
 
 export interface Link {

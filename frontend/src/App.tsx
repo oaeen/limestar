@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Header } from './components/Header';
 import { SearchBar } from './components/SearchBar';
 import { TagFilter } from './components/TagFilter';
@@ -27,7 +27,7 @@ function App() {
   }, []);
 
   // Fetch data
-  const { tags, refetch: refetchTags } = useTags();
+  const { categories, refetch: refetchTags } = useTags();
   const { links, isLoading, deleteLink } = useLinks({
     searchQuery: debouncedQuery,
     selectedTags,
@@ -52,12 +52,6 @@ function App() {
     setSelectedTags([]);
   }, []);
 
-  // Filter tags that have links
-  const visibleTags = useMemo(
-    () => tags.filter((tag) => tag.count > 0),
-    [tags]
-  );
-
   return (
     <div className="min-h-screen gradient-bg">
       {/* Header */}
@@ -73,9 +67,9 @@ function App() {
         />
 
         {/* Tags */}
-        {visibleTags.length > 0 && (
+        {categories.length > 0 && (
           <TagFilter
-            tags={visibleTags}
+            categories={categories}
             selectedTags={selectedTags}
             onTagSelect={handleTagSelect}
             onClearAll={handleClearTags}

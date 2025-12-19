@@ -10,11 +10,12 @@ from app.config import settings
 
 @dataclass
 class ProcessResult:
-    """AI processing result"""
+    """AI processing result with hierarchical tags"""
 
     title: str
     description: str
-    tags: List[str]
+    category: str  # Main category name
+    tags: List[str]  # Sub-tags
 
 
 class AIProcessor:
@@ -34,28 +35,32 @@ class AIProcessor:
         content: str,
         user_note: Optional[str] = None,
         existing_tags: Optional[List[str]] = None,
+        existing_categories: Optional[List[str]] = None,
     ) -> ProcessResult:
         """
-        Process a link and generate Chinese summary and tags.
+        Process a link and generate Chinese summary and hierarchical tags.
 
         Args:
             url: The URL of the link
             title: Original page title
             content: Extracted page content
             user_note: User provided note/description
-            existing_tags: List of existing tags in the system for reference
+            existing_tags: List of existing sub-tags in the system for reference
+            existing_categories: List of existing categories for reference
 
         Returns:
-            ProcessResult with title, description, and tags
+            ProcessResult with title, description, category and tags
         """
-        # Build prompt
+        # Build hints for existing data
+        categories_hint = ""
+        if existing_categories:
+            categories_hint = f"\n现有主分类（优先复用）: {', '.join(existing_categories)}"
+
         tags_hint = ""
         if existing_tags:
-            tags_hint = (
-                f"\n现有标签供参考（优先使用这些标签）: {', '.join(existing_tags[:20])}"
-            )
+            tags_hint = f"\n现有子标签供参考（优先复用）: {', '.join(existing_tags[:30])}"
 
-        prompt = f"""你是一个技术链接收藏助手。请分析以下网页内容，生成简洁的中文介绍和精准的技术标签。
+        prompt = f"""你是一个技术链接收藏助手。请分析以下网页内容，生成简洁的中文介绍，并分配一个主分类和精准的子标签。
 
 URL: {url}
 原标题: {title or '无'}
@@ -63,24 +68,29 @@ URL: {url}
 
 网页内容摘要:
 {content[:3000]}
+{categories_hint}
 {tags_hint}
 
 请返回 JSON 格式：
 {{
     "title": "简洁的中文标题（如果原标题是中文且合适可直接使用，否则翻译或重新拟定）",
     "description": "2-3句话的中文介绍，概括网页的主要内容和价值",
-    "tags": ["标签1", "标签2", "标签3"]
+    "category": "主分类名称",
+    "tags": ["子标签1", "子标签2", "子标签3"]
 }}
 
 要求：
 1. 标题简洁明了，不超过30字
 2. 介绍必须控制在120字以内，突出内容的价值和特点，不要换行
-3. 标签要求：
-   - 2-5个标签
-   - 使用具体的技术术语而非宽泛分类
-   - 除专业术语保留英文原文（如 LLM, Agent, Claude, GPT, Gemini, MCP, RAG, Prompt Engineering, LangChain, VibeCoding, Next.js, React 等），其他均使用中文
-   - 避免使用过于宽泛的标签如"AI"、"开发"、"工具"、"教程"、"资源"
-   - 标签应能精确描述内容涉及的具体技术、框架、产品或方法论
+3. 主分类要求：
+   - 描述内容所属的技术领域或方向（如"大模型应用"、"前端开发"、"效率工具"、"编程语言"等）
+   - 如果现有主分类匹配，必须复用，不要创建语义相近的新分类
+   - 主分类应具有聚合价值，避免过于具体或过于宽泛
+4. 子标签要求：
+   - 1-4个子标签，描述具体的技术、产品、框架或方法
+   - 专业术语保留英文（如 LLM, Agent, Claude, GPT, MCP, RAG, Prompt Engineering, Next.js, React 等）
+   - 子标签不要重复主分类的含义
+   - 避免使用过于宽泛的词如"AI"、"开发"、"工具"、"教程"
 """
 
         try:
@@ -103,7 +113,8 @@ URL: {url}
             return ProcessResult(
                 title=result.get("title", title or "未知标题"),
                 description=result.get("description", ""),
-                tags=result.get("tags", [])[:5],  # Limit to 5 tags
+                category=result.get("category", "未分类"),
+                tags=result.get("tags", [])[:4],  # Limit to 4 sub-tags
             )
 
         except Exception as e:
@@ -112,6 +123,7 @@ URL: {url}
             return ProcessResult(
                 title=title or "未知标题",
                 description=user_note or "",
+                category="未分类",
                 tags=[],
             )
 

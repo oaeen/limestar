@@ -1,6 +1,6 @@
 // LimeStar API Service
 
-import type { Link, LinkListResponse, TagWithCount } from '../types';
+import type { Link, LinkListResponse, TagWithCount, CategoryWithTags } from '../types';
 
 const API_BASE = '/api';
 
@@ -70,6 +70,10 @@ export const linksAPI = {
 export const tagsAPI = {
   getAll: (): Promise<TagWithCount[]> => {
     return fetchAPI<TagWithCount[]>('/tags');
+  },
+
+  getCategories: (): Promise<CategoryWithTags[]> => {
+    return fetchAPI<CategoryWithTags[]>('/tags/categories');
   },
 
   create: (data: { name: string; color?: string }): Promise<TagWithCount> => {

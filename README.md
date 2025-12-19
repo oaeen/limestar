@@ -78,7 +78,7 @@ nano .env
 OPENAI_API_KEY=your-api-key
 TELEGRAM_BOT_TOKEN=your-bot-token
 TELEGRAM_ALLOWED_USERS=your-user-id
-WEBHOOK_URL=https://your-domain.com/telegram/webhook
+WEBHOOK_URL=https://star.cug.life/telegram/webhook
 ```
 
 ### 2. 启动服务
@@ -92,7 +92,7 @@ docker-compose up -d --build
 ```nginx
 server {
     listen 80;
-    server_name your-domain.com;
+    server_name star.cug.life;
 
     # API 和 Webhook
     location /api {
@@ -234,7 +234,7 @@ OPENAI_MODEL_NAME=gpt-4o-mini
 # Telegram Bot
 TELEGRAM_BOT_TOKEN=your-bot-token
 TELEGRAM_ALLOWED_USERS=123456789  # 白名单，逗号分隔
-WEBHOOK_URL=https://your-domain.com/telegram/webhook  # 生产环境
+WEBHOOK_URL=https://star.cug.life/telegram/webhook  # 生产环境
 ```
 
 ## License

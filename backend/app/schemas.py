@@ -10,6 +10,8 @@ from pydantic import BaseModel, HttpUrl
 class TagBase(BaseModel):
     name: str
     color: Optional[str] = "#007AFF"
+    parent_id: Optional[int] = None
+    is_category: bool = False
 
 
 class TagCreate(TagBase):
@@ -25,6 +27,18 @@ class TagResponse(TagBase):
 
 class TagWithCount(TagResponse):
     count: int = 0
+
+
+class CategoryWithTags(BaseModel):
+    """Category with its child tags"""
+    id: int
+    name: str
+    color: str
+    count: int  # Total links in this category
+    tags: List[TagWithCount]  # Child tags
+
+    class Config:
+        from_attributes = True
 
 
 # ============== Link Schemas ==============

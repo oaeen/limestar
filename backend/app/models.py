@@ -15,13 +15,18 @@ class TagLinkAssociation(SQLModel, table=True):
 
 
 class Tag(SQLModel, table=True):
-    """Tag model for categorizing links"""
+    """Tag model for categorizing links with hierarchical structure"""
 
     __tablename__ = "tag"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(index=True, unique=True, max_length=50)
+    name: str = Field(index=True, max_length=50)
     color: str = Field(default="#007AFF", max_length=7)  # Apple Blue default
+
+    # Hierarchical fields
+    parent_id: Optional[int] = Field(default=None, foreign_key="tag.id", index=True)
+    is_category: bool = Field(default=False)  # True = category, False = sub-tag
+    sort_order: int = Field(default=0)  # Sorting weight
 
     # Relationships
     links: List["Link"] = Relationship(
