@@ -21,4 +21,4 @@ pydantic-settings>=2.0.0
 python-dotenv>=1.0.0
 
 # Telegram Bot (Phase 7)
-# python-telegram-bot>=21.0
+python-telegram-bot>=21.0

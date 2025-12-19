@@ -26,7 +26,14 @@ class Settings(BaseSettings):
 
     # Telegram Bot (Phase 7)
     TELEGRAM_BOT_TOKEN: Optional[str] = None
+    TELEGRAM_ALLOWED_USERS: str = ""  # 逗号分隔的用户 ID 列表
     WEBHOOK_URL: Optional[str] = None
+
+    def get_allowed_users(self) -> list[int]:
+        """解析白名单用户 ID 列表"""
+        if not self.TELEGRAM_ALLOWED_USERS:
+            return []
+        return [int(uid.strip()) for uid in self.TELEGRAM_ALLOWED_USERS.split(",") if uid.strip()]
 
     class Config:
         env_file = str(ENV_FILE)
