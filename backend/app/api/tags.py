@@ -7,6 +7,7 @@ from sqlmodel import Session, select, func
 from app.database import get_session
 from app.models import Tag, TagLinkAssociation
 from app.schemas import TagCreate, TagResponse, TagWithCount, CategoryWithTags
+from app.api.auth import require_auth
 
 router = APIRouter(prefix="/tags", tags=["tags"])
 
@@ -104,8 +105,12 @@ def get_tag(tag_id: int, session: Session = Depends(get_session)):
 
 
 @router.post("", response_model=TagResponse, status_code=201)
-def create_tag(tag_data: TagCreate, session: Session = Depends(get_session)):
-    """Create a new tag"""
+def create_tag(
+    tag_data: TagCreate,
+    session: Session = Depends(get_session),
+    _: str = Depends(require_auth),
+):
+    """Create a new tag. Requires authentication."""
     # Check if tag already exists
     existing = session.exec(select(Tag).where(Tag.name == tag_data.name)).first()
     if existing:
@@ -124,8 +129,9 @@ def update_tag(
     tag_id: int,
     tag_data: TagCreate,
     session: Session = Depends(get_session),
+    _: str = Depends(require_auth),
 ):
-    """Update a tag"""
+    """Update a tag. Requires authentication."""
     tag = session.get(Tag, tag_id)
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found")
@@ -147,8 +153,12 @@ def update_tag(
 
 
 @router.delete("/{tag_id}", status_code=204)
-def delete_tag(tag_id: int, session: Session = Depends(get_session)):
-    """Delete a tag"""
+def delete_tag(
+    tag_id: int,
+    session: Session = Depends(get_session),
+    _: str = Depends(require_auth),
+):
+    """Delete a tag. Requires authentication."""
     tag = session.get(Tag, tag_id)
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found")

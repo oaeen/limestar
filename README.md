@@ -10,6 +10,8 @@ AI 驱动的链接收藏系统，自动生成中文介绍和标签。
 - 🤖 AI 自动生成中文介绍和标签
 - 🏷️ 标签分类和关键词搜索
 - 🤖 Telegram Bot 支持
+- 🌐 Web 管理界面（添加/删除收藏）
+- 🔐 密码认证保护 API
 - 🎨 Apple Liquid Glass 设计风格
 - 📱 移动端响应式适配
 
@@ -154,6 +156,35 @@ https://example.com 这是一个很棒的工具
 
 ---
 
+## Web 管理界面
+
+### 启用 Web 管理
+
+在 `.env` 中设置管理密码：
+
+```env
+WEB_ADMIN_PASSWORD=your-secret-password
+```
+
+> 留空则禁用 Web 管理功能，所有写入 API 将返回 403 错误。
+
+### 使用方法
+
+1. **进入管理模式**：鼠标悬停在页面右上角（Logo 右侧区域），会出现一个灰色齿轮按钮
+2. **输入密码**：点击齿轮按钮，在弹出的对话框中输入管理密码
+3. **解锁功能**：
+   - 右下角出现绿色的「+」按钮，点击可添加收藏
+   - 每个链接卡片右上角出现星标按钮，点击可删除
+4. **退出管理模式**：点击右上角的绿色齿轮按钮即可退出
+
+### 安全说明
+
+- 认证 token 持久化存储在浏览器 localStorage
+- 后端 API 通过 Bearer Token 验证保护所有写入操作
+- 未认证时直接调用 POST/PUT/DELETE API 会返回 401 错误
+
+---
+
 ## CLI 命令行工具
 
 ```bash
@@ -179,16 +210,21 @@ python cli.py tags
 
 ## API 端点
 
-| 方法 | 端点 | 说明 |
-|------|------|------|
-| GET | /api/links | 获取链接列表 |
-| GET | /api/links/{id} | 获取单个链接 |
-| POST | /api/links | 创建链接 |
-| PUT | /api/links/{id} | 更新链接 |
-| DELETE | /api/links/{id} | 删除链接 |
-| GET | /api/tags | 获取所有标签 |
-| GET | /api/search | 搜索链接 |
-| POST | /telegram/webhook | Telegram Webhook |
+| 方法 | 端点 | 说明 | 认证 |
+|------|------|------|------|
+| GET | /api/links | 获取链接列表 | - |
+| GET | /api/links/{id} | 获取单个链接 | - |
+| POST | /api/links | 创建链接 | Bearer Token |
+| PUT | /api/links/{id} | 更新链接 | Bearer Token |
+| DELETE | /api/links/{id} | 删除链接 | Bearer Token |
+| GET | /api/tags | 获取所有标签 | - |
+| POST | /api/tags | 创建标签 | Bearer Token |
+| DELETE | /api/tags/{id} | 删除标签 | Bearer Token |
+| GET | /api/search | 搜索链接 | - |
+| POST | /api/auth/login | 登录获取 token | - |
+| POST | /api/auth/verify | 验证 token | - |
+| POST | /api/auth/logout | 登出 | - |
+| POST | /telegram/webhook | Telegram Webhook | - |
 
 ---
 
@@ -235,6 +271,9 @@ OPENAI_MODEL_NAME=gpt-4o-mini
 TELEGRAM_BOT_TOKEN=your-bot-token
 TELEGRAM_ALLOWED_USERS=123456789  # 白名单，逗号分隔
 WEBHOOK_URL=https://star.cug.life/telegram/webhook  # 生产环境
+
+# Web 管理认证
+WEB_ADMIN_PASSWORD=your-secret-password  # 留空则禁用 Web 管理
 ```
 
 ## License

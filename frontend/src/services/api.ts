@@ -3,18 +3,34 @@
 import type { Link, LinkListResponse, TagWithCount, CategoryWithTags, LoginResponse, VerifyResponse } from '../types';
 
 const API_BASE = '/api';
+const AUTH_TOKEN_KEY = 'limestar_auth_token';
+
+// 获取存储的认证 token
+function getAuthToken(): string | null {
+  return localStorage.getItem(AUTH_TOKEN_KEY);
+}
 
 // Generic fetch wrapper
 async function fetchAPI<T>(
   endpoint: string,
-  options?: RequestInit
+  options?: RequestInit & { requireAuth?: boolean }
 ): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options?.headers as Record<string, string>),
+  };
+
+  // 如果需要认证，添加 Authorization header
+  if (options?.requireAuth) {
+    const token = getAuthToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  }
+
   const response = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
+    headers,
   });
 
   if (!response.ok) {
@@ -48,6 +64,7 @@ export const linksAPI = {
     return fetchAPI<Link>('/links', {
       method: 'POST',
       body: JSON.stringify(data),
+      requireAuth: true,
     });
   },
 
@@ -58,11 +75,12 @@ export const linksAPI = {
     return fetchAPI<Link>(`/links/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
+      requireAuth: true,
     });
   },
 
   delete: (id: number): Promise<void> => {
-    return fetchAPI<void>(`/links/${id}`, { method: 'DELETE' });
+    return fetchAPI<void>(`/links/${id}`, { method: 'DELETE', requireAuth: true });
   },
 };
 
@@ -80,6 +98,7 @@ export const tagsAPI = {
     return fetchAPI<TagWithCount>('/tags', {
       method: 'POST',
       body: JSON.stringify(data),
+      requireAuth: true,
     });
   },
 };

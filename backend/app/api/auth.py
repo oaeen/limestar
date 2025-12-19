@@ -1,8 +1,9 @@
 """Authentication API Routes"""
 
 import secrets
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
+from typing import Optional
 
 from app.config import settings
 
@@ -10,6 +11,29 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 # 会话存储（token -> True，持久化直到服务重启）
 _sessions: set[str] = set()
+
+
+def require_auth(authorization: Optional[str] = Header(None)):
+    """
+    认证依赖：验证请求头中的 Bearer token
+    用于保护需要管理员权限的 API 端点
+    """
+    if not settings.WEB_ADMIN_PASSWORD:
+        raise HTTPException(status_code=403, detail="Web 管理功能未启用")
+
+    if not authorization:
+        raise HTTPException(status_code=401, detail="未提供认证信息")
+
+    # 解析 Bearer token
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="无效的认证格式")
+
+    token = authorization[7:]  # 去掉 "Bearer " 前缀
+
+    if token not in _sessions:
+        raise HTTPException(status_code=401, detail="无效或已过期的 token")
+
+    return token
 
 
 class LoginRequest(BaseModel):

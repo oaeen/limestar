@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from app.database import get_session, engine
 from app.models import Link, Tag, TagLinkAssociation
+from app.api.auth import require_auth
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -38,10 +39,11 @@ _reprocess_status = {
 async def reprocess_all_links(
     background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
+    _: str = Depends(require_auth),
 ):
     """
     Reprocess all links with the new hierarchical tagging system.
-    This runs as a background task.
+    This runs as a background task. Requires authentication.
     """
     global _reprocess_status
 
@@ -91,8 +93,11 @@ def get_reprocess_status():
 
 
 @router.post("/clear-tags")
-def clear_all_tags(session: Session = Depends(get_session)):
-    """Clear all tags and associations (use before reprocessing)"""
+def clear_all_tags(
+    session: Session = Depends(get_session),
+    _: str = Depends(require_auth),
+):
+    """Clear all tags and associations (use before reprocessing). Requires authentication."""
     from sqlalchemy import delete
 
     # Delete all tag-link associations

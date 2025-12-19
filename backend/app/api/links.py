@@ -14,6 +14,7 @@ from app.schemas import (
     LinkListResponse,
     TagResponse,
 )
+from app.api.auth import require_auth
 
 router = APIRouter(prefix="/links", tags=["links"])
 
@@ -64,8 +65,12 @@ def get_link(link_id: int, session: Session = Depends(get_session)):
 
 
 @router.post("", response_model=LinkResponse, status_code=201)
-def create_link(link_data: LinkCreate, session: Session = Depends(get_session)):
-    """Create a new link (without AI processing - just store)"""
+def create_link(
+    link_data: LinkCreate,
+    session: Session = Depends(get_session),
+    _: str = Depends(require_auth),
+):
+    """Create a new link (without AI processing - just store). Requires authentication."""
     from urllib.parse import urlparse
 
     # Extract domain
@@ -94,8 +99,9 @@ def update_link(
     link_id: int,
     link_data: LinkUpdate,
     session: Session = Depends(get_session),
+    _: str = Depends(require_auth),
 ):
-    """Update a link"""
+    """Update a link. Requires authentication."""
     link = session.get(Link, link_id)
     if not link:
         raise HTTPException(status_code=404, detail="Link not found")
@@ -127,8 +133,12 @@ def update_link(
 
 
 @router.delete("/{link_id}", status_code=204)
-def delete_link(link_id: int, session: Session = Depends(get_session)):
-    """Delete a link"""
+def delete_link(
+    link_id: int,
+    session: Session = Depends(get_session),
+    _: str = Depends(require_auth),
+):
+    """Delete a link. Requires authentication."""
     link = session.get(Link, link_id)
     if not link:
         raise HTTPException(status_code=404, detail="Link not found")
