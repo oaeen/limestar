@@ -1,0 +1,48 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv
+venv
+env
+*.egg-info
+
+# Node.js
+node_modules
+npm-debug.log
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# 本地数据和配置
+*.db
+.env
+.env.local
+.env.*.local
+
+# 构建产物
+dist
+build
+*.log
+
+# 测试
+.pytest_cache
+.coverage
+htmlcov
+
+# 文档
+*.md
+!README.md
+
+# 其他
+.DS_Store
+Thumbs.db

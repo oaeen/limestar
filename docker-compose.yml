@@ -1,0 +1,41 @@
+# LimeStar Docker Compose 配置
+# 使用方法: docker-compose up -d --build
+
+version: '3.8'
+
+services:
+  # 后端服务（FastAPI + Telegram Bot Webhook）
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: limestar-backend
+    ports:
+      - "18765:8000"
+    volumes:
+      # 数据库持久化
+      - ./data:/app/data
+    env_file:
+      - .env
+    environment:
+      # 使用持久化路径的数据库
+      - DATABASE_URL=sqlite:///./data/limestar.db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 前端服务（React + Vite 静态文件）
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: limestar-frontend
+    ports:
+      - "18766:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+

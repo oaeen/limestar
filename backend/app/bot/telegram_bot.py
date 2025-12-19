@@ -1,8 +1,12 @@
 """Telegram Bot - 主入口和启动逻辑"""
 
+from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
 from app.config import settings
+
+# 全局 Bot 应用实例（用于 Webhook 模式）
+_bot_app: Application | None = None
 from app.bot.handlers import (
     start,
     help_cmd,
@@ -54,3 +58,48 @@ def run_polling():
         allowed_updates=["message"],
         drop_pending_updates=True,  # 忽略离线期间的消息
     )
+
+
+async def get_bot_app() -> Application:
+    """获取或创建 Bot 应用实例（用于 Webhook 模式）"""
+    global _bot_app
+    if _bot_app is None:
+        _bot_app = create_bot()
+        await _bot_app.initialize()
+    return _bot_app
+
+
+async def process_webhook_update(data: dict) -> dict:
+    """处理 Telegram Webhook 请求
+
+    Args:
+        data: Telegram 发送的 update JSON 数据
+
+    Returns:
+        {"ok": True} 表示处理成功
+    """
+    app = await get_bot_app()
+    update = Update.de_json(data, app.bot)
+    await app.process_update(update)
+    return {"ok": True}
+
+
+async def setup_webhook(webhook_url: str) -> bool:
+    """设置 Telegram Webhook
+
+    Args:
+        webhook_url: Webhook URL，例如 https://your-domain.com/telegram/webhook
+
+    Returns:
+        是否设置成功
+    """
+    app = await get_bot_app()
+    result = await app.bot.set_webhook(url=webhook_url)
+    return result
+
+
+async def delete_webhook() -> bool:
+    """删除 Telegram Webhook，切换回 Polling 模式"""
+    app = await get_bot_app()
+    result = await app.bot.delete_webhook()
+    return result

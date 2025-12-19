@@ -4,12 +4,13 @@ FastAPI main application entry point.
 """
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import init_db
 from app.api import links, tags, search
+from app.bot.telegram_bot import process_webhook_update, setup_webhook
 
 
 @asynccontextmanager
@@ -17,6 +18,15 @@ async def lifespan(app: FastAPI):
     """Application lifespan events"""
     # Startup
     init_db()
+
+    # 如果配置了 WEBHOOK_URL，自动设置 Telegram Webhook
+    if settings.WEBHOOK_URL and settings.TELEGRAM_BOT_TOKEN:
+        try:
+            await setup_webhook(settings.WEBHOOK_URL)
+            print(f"Telegram Webhook 已设置: {settings.WEBHOOK_URL}")
+        except Exception as e:
+            print(f"设置 Telegram Webhook 失败: {e}")
+
     yield
     # Shutdown
     pass
@@ -59,3 +69,18 @@ def root():
 def health_check():
     """Health check endpoint"""
     return {"status": "healthy"}
+
+
+# Telegram Webhook 端点
+@app.post("/telegram/webhook")
+async def telegram_webhook(request: Request):
+    """处理 Telegram Webhook 请求"""
+    if not settings.TELEGRAM_BOT_TOKEN:
+        return {"ok": False, "error": "Bot not configured"}
+
+    try:
+        data = await request.json()
+        return await process_webhook_update(data)
+    except Exception as e:
+        print(f"Webhook 处理错误: {e}")
+        return {"ok": False, "error": str(e)}
