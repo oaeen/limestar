@@ -13,6 +13,7 @@ from app.bot.handlers import (
     list_links,
     search_links,
     handle_message,
+    refresh_link,
     rebuild_tags,
     rebuild_status,
     handle_rebuild_callback,
@@ -31,6 +32,7 @@ def create_bot() -> Application:
     app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(CommandHandler("list", list_links))
     app.add_handler(CommandHandler("search", search_links))
+    app.add_handler(CommandHandler("refresh", refresh_link))
     app.add_handler(CommandHandler("rebuild_tags", rebuild_tags))
     app.add_handler(CommandHandler("rebuild_status", rebuild_status))
 

@@ -68,16 +68,22 @@ class AIProcessor:
         user_note: Optional[str] = None,
         existing_tags: Optional[List[str]] = None,
         existing_categories: Optional[List[str]] = None,
+        hint: Optional[str] = None,
     ) -> ProcessResult:
         """
         Two-stage processing: generate candidates first, then filter and classify.
 
         Stage 1: Generate candidate tags freely (without reference to existing tags)
         Stage 2: Filter and merge with existing tags, determine final category
+
+        Args:
+            hint: Optional user hint to guide tag generation (e.g., "这是关于AI Agent的")
         """
         try:
             # Stage 1: Generate candidates
-            candidates = await self._generate_candidates(url, title, content, user_note)
+            candidates = await self._generate_candidates(
+                url, title, content, user_note, hint
+            )
 
             # Stage 2: Filter and classify
             result = await self._filter_and_classify(
@@ -102,14 +108,18 @@ class AIProcessor:
         title: Optional[str],
         content: str,
         user_note: Optional[str] = None,
+        hint: Optional[str] = None,
     ) -> CandidateResult:
         """Stage 1: Generate candidate tags and categories freely"""
 
-        prompt = f"""你是一个技术内容分析专家。请分析以下网页内容，生成中文标题、介绍，以及多个候选分类和标签。
+        # 用户提示（可用于手动指导）
+        hint_text = f"\n用户指导: {hint}" if hint else ""
+
+        prompt = f"""你是一个技术内容分析专家。请分析以下网页的【主题内容】，生成中文标题、介绍，以及多个候选分类和标签。
 
 URL: {url}
 原标题: {title or '无'}
-{f"用户备注: {user_note}" if user_note else ""}
+{f"用户备注: {user_note}" if user_note else ""}{hint_text}
 
 网页内容摘要:
 {content[:3000]}
@@ -135,6 +145,10 @@ URL: {url}
    - 专业术语保留英文（如 React, Vue, LLM, Agent, Claude, GPT, MCP, RAG, Kubernetes, Docker 等）
    - 中文概念用中文（如 Prompt工程, 微服务, 状态管理 等）
    - 标签要具体，避免过于宽泛的词（如"开发"、"工具"、"教程"）
+
+重要：
+- 分析的是网页讨论的【主题和内容】
+- 如果用户给出了指导，优先参考用户的指导
 """
 
         response = await self.client.chat.completions.create(
@@ -223,7 +237,14 @@ URL: {url}
         return ProcessResult(
             title=candidates.title,
             description=candidates.description,
-            category=result.get("category", candidates.candidate_categories[0] if candidates.candidate_categories else "未分类"),
+            category=result.get(
+                "category",
+                (
+                    candidates.candidate_categories[0]
+                    if candidates.candidate_categories
+                    else "未分类"
+                ),
+            ),
             tags=result.get("tags", candidates.candidate_tags[:4])[:4],
         )
 

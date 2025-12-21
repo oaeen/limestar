@@ -61,13 +61,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 命令列表：
 /list [n] - 显示最近 n 条收藏（默认 5）
 /search <关键词> - 搜索收藏
+/refresh <url> [提示] - 刷新链接标签
 /rebuild_tags - 重建所有标签（需确认）
-/rebuild_status - 查看重建进度
 /help - 显示帮助
 
 小技巧：
 - 链接后可附带备注，如：
-  https://example.com 这是一个好工具"""
+  https://example.com 这是一个好工具
+- 标签不准确时用 /refresh 刷新，可加提示：
+  /refresh https://agents.md/ 这是AI Agent相关"""
     await update.message.reply_text(welcome_text)
 
 
@@ -89,7 +91,11 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 例：/search github
 
 标签管理：
-/rebuild_tags - 清除并重建所有标签
+/refresh <url> - 刷新单条链接标签
+/refresh <url> <提示> - 带提示刷新
+例：/refresh https://agents.md/ 这是AI Agent网站
+
+/rebuild_tags - 重建所有标签（需确认）
 /rebuild_status - 查看重建进度"""
     await update.message.reply_text(help_text)
 
@@ -225,6 +231,82 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         await processing_msg.edit_text(f"处理失败: {str(e)}")
+
+
+@require_auth
+async def refresh_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """处理 /refresh 命令 - 刷新单条链接的标签
+
+    用法：
+    /refresh <url> [提示]
+    例如：/refresh https://agents.md/ 这是关于AI Agent的网站
+    """
+    if not context.args:
+        await update.message.reply_text(
+            "用法：/refresh <url> [提示]\n"
+            "例如：/refresh https://agents.md/ 这是关于AI Agent的网站\n\n"
+            "提示是可选的，用于指导AI更准确地打标签"
+        )
+        return
+
+    # 解析URL和提示
+    url = context.args[0]
+    hint = " ".join(context.args[1:]) if len(context.args) > 1 else None
+
+    # 规范化URL
+    if not url.startswith(('http://', 'https://')):
+        url = 'https://' + url
+
+    processing_msg = await update.message.reply_text("正在刷新标签...")
+
+    try:
+        with Session(engine) as session:
+            # 查找链接
+            link = session.exec(select(Link).where(Link.url == url)).first()
+            if not link:
+                await processing_msg.edit_text(f"未找到该链接：{url}")
+                return
+
+            link_id = link.id  # 保存ID
+
+            # 清除旧标签
+            link.tags = []
+            link.is_processed = False
+            session.add(link)
+            session.commit()
+
+        # 用新session重新处理
+        with Session(engine) as session:
+            link = await link_processor.process_link(
+                link_id=link_id,
+                session=session,
+                hint=hint,
+                force=True,
+            )
+
+            # 构建结果消息
+            lines = ["标签已刷新！\n"]
+            lines.append(f"<b>{escape_html(link.title)}</b>")
+            lines.append(f"{escape_html(link.description)}\n")
+
+            if link.tags:
+                # 分类和子标签分开显示
+                categories = [t for t in link.tags if t.is_category]
+                subtags = [t for t in link.tags if not t.is_category]
+
+                if categories:
+                    lines.append(f"分类: {categories[0].name}")
+                if subtags:
+                    tag_names = " | ".join(t.name for t in subtags)
+                    lines.append(f"标签: {tag_names}")
+
+            if hint:
+                lines.append(f"\n(使用提示: {escape_html(hint)})")
+
+            await processing_msg.edit_text("\n".join(lines), parse_mode="HTML")
+
+    except Exception as e:
+        await processing_msg.edit_text(f"刷新失败: {str(e)}")
 
 
 @require_auth

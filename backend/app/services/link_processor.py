@@ -23,6 +23,8 @@ class LinkProcessor:
         self,
         link_id: int,
         session: Session,
+        hint: Optional[str] = None,
+        force: bool = False,
     ) -> Link:
         """
         Process a link: fetch content, generate AI summary, and update tags.
@@ -30,6 +32,8 @@ class LinkProcessor:
         Args:
             link_id: ID of the link to process
             session: Database session
+            hint: Optional hint to guide AI tag generation
+            force: Force reprocess even if already processed
 
         Returns:
             Updated Link object
@@ -39,7 +43,7 @@ class LinkProcessor:
         if not link:
             raise ValueError(f"Link {link_id} not found")
 
-        if link.is_processed:
+        if link.is_processed and not force:
             return link
 
         try:
@@ -51,13 +55,14 @@ class LinkProcessor:
             existing_categories = self._get_existing_categories(session)
 
             # 3. AI processing
-            result = await ai_processor.process(
+            result = await ai_processor.process_two_stage(
                 url=link.url,
                 title=scraped.title,
                 content=scraped.text_content,
                 user_note=link.user_note,
                 existing_tags=existing_tags,
                 existing_categories=existing_categories,
+                hint=hint,
             )
 
             # 4. Update link
