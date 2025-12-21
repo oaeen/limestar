@@ -18,6 +18,16 @@ class ProcessResult:
     tags: List[str]  # Sub-tags
 
 
+@dataclass
+class CandidateResult:
+    """First stage result with candidate tags"""
+
+    title: str
+    description: str
+    candidate_categories: List[str]  # 1-2 candidate categories
+    candidate_tags: List[str]  # 5-8 candidate tags
+
+
 class AIProcessor:
     """AI processor for generating summaries and tags"""
 
@@ -38,29 +48,64 @@ class AIProcessor:
         existing_categories: Optional[List[str]] = None,
     ) -> ProcessResult:
         """
-        Process a link and generate Chinese summary and hierarchical tags.
-
-        Args:
-            url: The URL of the link
-            title: Original page title
-            content: Extracted page content
-            user_note: User provided note/description
-            existing_tags: List of existing sub-tags in the system for reference
-            existing_categories: List of existing categories for reference
-
-        Returns:
-            ProcessResult with title, description, category and tags
+        Legacy single-stage process (kept for compatibility).
+        Now delegates to two-stage processing.
         """
-        # Build hints for existing data
-        categories_hint = ""
-        if existing_categories:
-            categories_hint = f"\n现有主分类（优先复用）: {', '.join(existing_categories)}"
+        return await self.process_two_stage(
+            url=url,
+            title=title,
+            content=content,
+            user_note=user_note,
+            existing_tags=existing_tags,
+            existing_categories=existing_categories,
+        )
 
-        tags_hint = ""
-        if existing_tags:
-            tags_hint = f"\n现有子标签供参考（优先复用）: {', '.join(existing_tags[:30])}"
+    async def process_two_stage(
+        self,
+        url: str,
+        title: Optional[str],
+        content: str,
+        user_note: Optional[str] = None,
+        existing_tags: Optional[List[str]] = None,
+        existing_categories: Optional[List[str]] = None,
+    ) -> ProcessResult:
+        """
+        Two-stage processing: generate candidates first, then filter and classify.
 
-        prompt = f"""你是一个技术链接收藏助手。请分析以下网页内容，生成简洁的中文介绍，并分配一个主分类和精准的子标签。
+        Stage 1: Generate candidate tags freely (without reference to existing tags)
+        Stage 2: Filter and merge with existing tags, determine final category
+        """
+        try:
+            # Stage 1: Generate candidates
+            candidates = await self._generate_candidates(url, title, content, user_note)
+
+            # Stage 2: Filter and classify
+            result = await self._filter_and_classify(
+                candidates=candidates,
+                existing_tags=existing_tags or [],
+                existing_categories=existing_categories or [],
+            )
+            return result
+
+        except Exception as e:
+            print(f"Two-stage AI processing error: {e}")
+            return ProcessResult(
+                title=title or "未知标题",
+                description=user_note or "",
+                category="未分类",
+                tags=[],
+            )
+
+    async def _generate_candidates(
+        self,
+        url: str,
+        title: Optional[str],
+        content: str,
+        user_note: Optional[str] = None,
+    ) -> CandidateResult:
+        """Stage 1: Generate candidate tags and categories freely"""
+
+        prompt = f"""你是一个技术内容分析专家。请分析以下网页内容，生成中文标题、介绍，以及多个候选分类和标签。
 
 URL: {url}
 原标题: {title or '无'}
@@ -68,64 +113,119 @@ URL: {url}
 
 网页内容摘要:
 {content[:3000]}
-{categories_hint}
-{tags_hint}
 
 请返回 JSON 格式：
 {{
-    "title": "简洁的中文标题（如果原标题是中文且合适可直接使用，否则翻译或重新拟定）",
-    "description": "2-3句话的中文介绍，概括网页的主要内容和价值",
-    "category": "主分类名称",
-    "tags": ["子标签1", "子标签2", "子标签3"]
+    "title": "简洁的中文标题",
+    "description": "2-3句话的中文介绍",
+    "candidate_categories": ["候选分类1", "候选分类2"],
+    "candidate_tags": ["标签1", "标签2", "标签3", "标签4", "标签5", "标签6"]
 }}
 
 要求：
-1. 标题简洁明了，不超过30字
-2. 介绍必须控制在120字以内，突出内容的价值和特点，不要换行
-3. 主分类要求：
-   - 描述内容所属的技术领域或方向（如"大模型应用"、"前端开发"、"效率工具"、"编程语言"等）
-   - 如果现有主分类匹配，必须复用，不要创建语义相近的新分类
-   - 主分类应具有聚合价值，避免过于具体或过于宽泛
-4. 子标签要求：
-   - 1-4个子标签，描述具体的技术、产品、框架或方法
-   - 专业术语保留英文（如 LLM, Agent, Claude, GPT, MCP, RAG, Prompt Engineering, Next.js, React 等）
-   - 子标签不要重复主分类的含义
-   - 避免使用过于宽泛的词如"AI"、"开发"、"工具"、"教程"
+1. 标题简洁明了，不超过30字。如果原标题是中文且合适可直接使用
+2. 介绍控制在120字以内，突出内容价值，不要换行
+3. 候选分类（1-2个）：
+   - 准确描述内容所属的技术领域
+   - 常见分类示例：前端开发、后端开发、大模型应用、DevOps、移动开发、数据科学、系统架构、效率工具、编程语言、云计算、安全技术、产品设计、开源项目等
+   - 根据内容主题选择最贴切的分类，不要强行归类
+4. 候选标签（5-8个）：
+   - 尽可能多地提取相关标签
+   - 包括：具体技术、框架、产品名称、方法论、概念等
+   - 专业术语保留英文（如 React, Vue, LLM, Agent, Claude, GPT, MCP, RAG, Kubernetes, Docker 等）
+   - 中文概念用中文（如 Prompt工程, 微服务, 状态管理 等）
+   - 标签要具体，避免过于宽泛的词（如"开发"、"工具"、"教程"）
 """
 
-        try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "你是一个专业的链接收藏助手，擅长分析网页内容并生成简洁的中文介绍。始终返回有效的 JSON 格式。",
-                    },
-                    {"role": "user", "content": prompt},
-                ],
-                response_format={"type": "json_object"},
-                temperature=0.7,
-                max_tokens=500,
-            )
+        response = await self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "你是一个专业的技术内容分析专家，擅长分析网页内容并提取关键信息。始终返回有效的 JSON 格式。",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.7,
+            max_tokens=600,
+        )
 
-            result = json.loads(response.choices[0].message.content)
+        result = json.loads(response.choices[0].message.content)
 
-            return ProcessResult(
-                title=result.get("title", title or "未知标题"),
-                description=result.get("description", ""),
-                category=result.get("category", "未分类"),
-                tags=result.get("tags", [])[:4],  # Limit to 4 sub-tags
-            )
+        return CandidateResult(
+            title=result.get("title", title or "未知标题"),
+            description=result.get("description", ""),
+            candidate_categories=result.get("candidate_categories", ["未分类"])[:2],
+            candidate_tags=result.get("candidate_tags", [])[:8],
+        )
 
-        except Exception as e:
-            # Fallback if AI fails
-            print(f"AI processing error: {e}")
-            return ProcessResult(
-                title=title or "未知标题",
-                description=user_note or "",
-                category="未分类",
-                tags=[],
-            )
+    async def _filter_and_classify(
+        self,
+        candidates: CandidateResult,
+        existing_tags: List[str],
+        existing_categories: List[str],
+    ) -> ProcessResult:
+        """Stage 2: Filter candidates and merge with existing tags"""
+
+        # Build context for existing data
+        categories_context = ""
+        if existing_categories:
+            categories_context = f"现有分类库: {', '.join(existing_categories)}"
+
+        tags_context = ""
+        if existing_tags:
+            tags_context = f"现有标签库: {', '.join(existing_tags[:50])}"
+
+        prompt = f"""你是一个标签管理专家。请根据候选标签和现有标签库，确定最终的分类和标签。
+
+候选分类: {', '.join(candidates.candidate_categories)}
+候选标签: {', '.join(candidates.candidate_tags)}
+
+{categories_context}
+{tags_context}
+
+请返回 JSON 格式：
+{{
+    "category": "最终分类",
+    "tags": ["标签1", "标签2", "标签3", "标签4"]
+}}
+
+要求：
+1. 最终分类：
+   - 如果候选分类与现有分类语义相同或非常接近，选择现有分类（如"前端"和"前端开发"应选择已有的那个）
+   - 如果候选分类是全新的领域，可以创建新分类
+   - 不要把不相关的内容强行归到已有分类
+
+2. 最终标签（3-4个）：
+   - 从候选标签中选择最有代表性的
+   - 如果候选标签与现有标签语义相同，优先使用现有标签（保持一致性）
+   - 合并相似标签（如 "Prompt Engineering" 和 "Prompt工程" 选择一个）
+   - 确保标签与分类不重复
+"""
+
+        response = await self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "你是一个标签管理专家，擅长整理和归类标签。始终返回有效的 JSON 格式。",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.3,  # Lower temperature for more consistent classification
+            max_tokens=300,
+        )
+
+        result = json.loads(response.choices[0].message.content)
+
+        return ProcessResult(
+            title=candidates.title,
+            description=candidates.description,
+            category=result.get("category", candidates.candidate_categories[0] if candidates.candidate_categories else "未分类"),
+            tags=result.get("tags", candidates.candidate_tags[:4])[:4],
+        )
 
 
 # Global instance

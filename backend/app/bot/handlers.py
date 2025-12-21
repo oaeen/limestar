@@ -2,22 +2,33 @@
 
 import re
 import html
+import asyncio
 from functools import wraps
 from typing import Optional
+
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes
+from sqlmodel import Session, select, desc
+from sqlalchemy import delete
+
+from app.config import settings
+from app.database import engine
+from app.models import Link, Tag, TagLinkAssociation
+from app.services.link_processor import link_processor
 
 
 def escape_html(text: str) -> str:
     """转义 HTML 特殊字符"""
     return html.escape(text)
 
-from telegram import Update
-from telegram.ext import ContextTypes
-from sqlmodel import Session, select, desc
 
-from app.config import settings
-from app.database import engine
-from app.models import Link
-from app.services.link_processor import link_processor
+# 重建状态追踪
+_rebuild_status = {
+    "running": False,
+    "processed": 0,
+    "total": 0,
+    "current_url": None,
+}
 
 
 # URL 正则表达式
@@ -50,6 +61,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 命令列表：
 /list [n] - 显示最近 n 条收藏（默认 5）
 /search <关键词> - 搜索收藏
+/rebuild_tags - 重建所有标签（需确认）
+/rebuild_status - 查看重建进度
 /help - 显示帮助
 
 小技巧：
@@ -73,7 +86,11 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 搜索收藏：
 /search <关键词>
-例：/search github"""
+例：/search github
+
+标签管理：
+/rebuild_tags - 清除并重建所有标签
+/rebuild_status - 查看重建进度"""
     await update.message.reply_text(help_text)
 
 
@@ -208,3 +225,159 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         await processing_msg.edit_text(f"处理失败: {str(e)}")
+
+
+@require_auth
+async def rebuild_tags(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """处理 /rebuild_tags 命令 - 重建所有标签（带二次确认）"""
+    global _rebuild_status
+
+    # 检查是否正在运行
+    if _rebuild_status["running"]:
+        progress = f"{_rebuild_status['processed']}/{_rebuild_status['total']}"
+        await update.message.reply_text(
+            f"标签重建正在进行中...\n"
+            f"进度: {progress}\n"
+            f"当前: {_rebuild_status['current_url'] or '准备中'}"
+        )
+        return
+
+    # 获取链接总数
+    with Session(engine) as session:
+        total = len(session.exec(select(Link.id)).all())
+
+    if total == 0:
+        await update.message.reply_text("没有需要处理的链接")
+        return
+
+    # 发送确认按钮
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("确认重建", callback_data="rebuild_confirm"),
+            InlineKeyboardButton("取消", callback_data="rebuild_cancel"),
+        ]
+    ])
+
+    await update.message.reply_text(
+        f"⚠️ <b>标签重建确认</b>\n\n"
+        f"即将执行以下操作：\n"
+        f"1. 清除所有现有标签和分类\n"
+        f"2. 重新处理所有 {total} 条链接\n"
+        f"3. 使用AI重新生成标签\n\n"
+        f"这个操作可能需要较长时间，确定要继续吗？",
+        reply_markup=keyboard,
+        parse_mode="HTML"
+    )
+
+
+async def handle_rebuild_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """处理重建确认回调"""
+    global _rebuild_status
+
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "rebuild_cancel":
+        await query.edit_message_text("已取消标签重建")
+        return
+
+    if query.data == "rebuild_confirm":
+        # 再次检查是否正在运行
+        if _rebuild_status["running"]:
+            await query.edit_message_text("标签重建已在运行中，请稍候...")
+            return
+
+        await query.edit_message_text("正在启动标签重建...")
+
+        # 启动后台任务
+        asyncio.create_task(_do_rebuild_tags(query))
+
+
+async def _do_rebuild_tags(query):
+    """执行标签重建的后台任务"""
+    global _rebuild_status
+
+    try:
+        _rebuild_status["running"] = True
+        _rebuild_status["processed"] = 0
+
+        # Step 1: 清除所有标签
+        with Session(engine) as session:
+            session.exec(delete(TagLinkAssociation))
+            session.exec(delete(Tag))
+            session.commit()
+
+        await query.edit_message_text("已清除旧标签，开始重新处理链接...")
+
+        # Step 2: 获取所有链接
+        with Session(engine) as session:
+            links = session.exec(select(Link.id, Link.url)).all()
+            _rebuild_status["total"] = len(links)
+
+        # Step 3: 逐个重新处理
+        for i, (link_id, url) in enumerate(links):
+            _rebuild_status["processed"] = i
+            _rebuild_status["current_url"] = url
+
+            try:
+                with Session(engine) as session:
+                    link = session.get(Link, link_id)
+                    if link:
+                        link.is_processed = False
+                        link.tags = []
+                        session.add(link)
+                        session.commit()
+
+                        await link_processor.process_link(link_id, session)
+
+            except Exception as e:
+                print(f"重建标签失败 [{link_id}] {url}: {e}")
+                continue
+
+            # 每处理10个更新一次进度
+            if (i + 1) % 10 == 0:
+                try:
+                    await query.edit_message_text(
+                        f"标签重建进行中...\n"
+                        f"进度: {i + 1}/{_rebuild_status['total']}\n"
+                        f"当前: {url[:50]}..."
+                    )
+                except Exception:
+                    pass  # 忽略消息编辑错误
+
+            # 避免请求过快
+            await asyncio.sleep(0.5)
+
+        # 完成
+        _rebuild_status["processed"] = _rebuild_status["total"]
+        _rebuild_status["current_url"] = None
+
+        await query.edit_message_text(
+            f"标签重建完成！\n"
+            f"共处理 {_rebuild_status['total']} 条链接"
+        )
+
+    except Exception as e:
+        await query.edit_message_text(f"标签重建失败: {str(e)}")
+
+    finally:
+        _rebuild_status["running"] = False
+
+
+@require_auth
+async def rebuild_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """处理 /rebuild_status 命令 - 查看重建状态"""
+    global _rebuild_status
+
+    if not _rebuild_status["running"]:
+        await update.message.reply_text("当前没有正在进行的标签重建任务")
+        return
+
+    progress = f"{_rebuild_status['processed']}/{_rebuild_status['total']}"
+    percent = int(_rebuild_status['processed'] / _rebuild_status['total'] * 100) if _rebuild_status['total'] > 0 else 0
+
+    await update.message.reply_text(
+        f"标签重建进行中...\n"
+        f"进度: {progress} ({percent}%)\n"
+        f"当前: {_rebuild_status['current_url'] or '准备中'}"
+    )
