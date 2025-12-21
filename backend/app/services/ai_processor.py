@@ -112,8 +112,8 @@ class AIProcessor:
     ) -> CandidateResult:
         """Stage 1: Generate candidate tags and categories freely"""
 
-        # 用户提示（可用于手动指导）
-        hint_text = f"\n用户指导: {hint}" if hint else ""
+        # 用户提示（可用于手动指导）- 使用更强的格式
+        hint_text = f"\n\n【用户明确指导】请根据以下指导来确定分类和标签: {hint}" if hint else ""
 
         prompt = f"""你是一个技术内容分析专家。请分析以下网页的【主题内容】，生成中文标题、介绍，以及多个候选分类和标签。
 
@@ -146,9 +146,14 @@ URL: {url}
    - 中文概念用中文（如 Prompt工程, 微服务, 状态管理 等）
    - 标签要具体，避免过于宽泛的词（如"开发"、"工具"、"教程"）
 
-重要：
-- 分析的是网页讨论的【主题和内容】
-- 如果用户给出了指导，优先参考用户的指导
+重要（必须遵守）：
+- 分析的是网页讨论的【核心主题】，不是网页中提到的所有技术
+- 区分"网页在讲什么"和"网页举例用到什么"：
+  - 如果网页是介绍某个工具/规范/方法，标签应该是这个工具/规范/方法本身
+  - 如果网页只是用React/Vite作为示例，不要把React/Vite作为标签
+  - 例如：一篇介绍"如何写README"的文章用Python举例，标签应该是"README"、"文档规范"，而不是"Python"
+- 如果用户给出了指导，【必须优先】参考用户的指导来确定分类和标签
+- 用户指导的优先级高于网页内容分析
 """
 
         response = await self.client.chat.completions.create(
