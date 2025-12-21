@@ -320,6 +320,7 @@ async def _do_rebuild_tags(query):
             _rebuild_status["current_url"] = url
 
             try:
+                # 先重置链接状态
                 with Session(engine) as session:
                     link = session.get(Link, link_id)
                     if link:
@@ -328,25 +329,28 @@ async def _do_rebuild_tags(query):
                         session.add(link)
                         session.commit()
 
-                        await link_processor.process_link(link_id, session)
+                # 用新的session重新处理
+                with Session(engine) as session:
+                    await link_processor.process_link(link_id, session)
 
             except Exception as e:
                 print(f"重建标签失败 [{link_id}] {url}: {e}")
                 continue
 
-            # 每处理10个更新一次进度
-            if (i + 1) % 10 == 0:
+            # 根据总数决定更新频率（小数量每条都更新，大数量每10条更新）
+            update_interval = 1 if _rebuild_status["total"] <= 20 else 10
+            if (i + 1) % update_interval == 0 or i == 0:
                 try:
                     await query.edit_message_text(
                         f"标签重建进行中...\n"
                         f"进度: {i + 1}/{_rebuild_status['total']}\n"
-                        f"当前: {url[:50]}..."
+                        f"当前: {url[:50]}{'...' if len(url) > 50 else ''}"
                     )
                 except Exception:
                     pass  # 忽略消息编辑错误
 
             # 避免请求过快
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(1.0)  # 两阶段处理需要更多时间
 
         # 完成
         _rebuild_status["processed"] = _rebuild_status["total"]
