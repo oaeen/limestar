@@ -102,7 +102,10 @@ async def setup_webhook(webhook_url: str) -> bool:
         是否设置成功
     """
     app = await get_bot_app()
-    result = await app.bot.set_webhook(url=webhook_url)
+    result = await app.bot.set_webhook(
+        url=webhook_url,
+        allowed_updates=["message", "callback_query"],  # 支持消息和按钮回调
+    )
     return result
 
 
